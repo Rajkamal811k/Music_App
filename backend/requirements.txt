@@ -14,5 +14,7 @@ pwdlib[argon2]
 python-multipart
 email-validator
 
+aiofiles
+
 pytest
 httpx

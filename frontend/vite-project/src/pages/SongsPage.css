@@ -1,0 +1,126 @@
+/* ── Songs Page ──────────────────────────────────────────────── */
+
+.songs-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px 100px;
+}
+
+.songs-header {
+  margin-bottom: 32px;
+}
+
+.songs-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 20px;
+}
+
+.songs-search-wrap {
+  position: relative;
+  max-width: 480px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+
+.songs-search {
+  width: 100%;
+  padding: 12px 16px 12px 44px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.songs-search::placeholder {
+  color: var(--text-muted);
+}
+
+.songs-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+/* ── Empty / Loading ────────────────────────────────────────── */
+
+.songs-loading {
+  display: flex;
+  justify-content: center;
+  padding: 80px 0;
+}
+
+.songs-empty {
+  text-align: center;
+  padding: 80px 20px;
+}
+
+.songs-empty-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.songs-empty h2 {
+  font-size: 1.3rem;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.songs-empty p {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ── Track list with genre column ───────────────────────────── */
+
+.songs-page .track-list-header,
+.songs-page .track-row {
+  grid-template-columns: 48px 1fr 1fr 100px 64px;
+}
+
+.track-genre {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.track-row-active {
+  background: var(--accent-bg) !important;
+}
+
+.track-row-active .track-info .track-title {
+  color: var(--accent) !important;
+}
+
+.track-playing-icon {
+  color: var(--accent);
+  animation: pulse-icon 1s ease-in-out infinite;
+}
+
+@keyframes pulse-icon {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (max-width: 768px) {
+  .songs-page .track-list-header,
+  .songs-page .track-row {
+    grid-template-columns: 36px 1fr 64px;
+  }
+
+  .track-album,
+  .track-genre {
+    display: none;
+  }
+}

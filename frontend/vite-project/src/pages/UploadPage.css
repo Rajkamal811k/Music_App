@@ -1,0 +1,86 @@
+/* ── Upload Page ─────────────────────────────────────────────── */
+
+.upload-page {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 20px 100px;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 80%, rgba(236, 72, 153, 0.05) 0%, transparent 50%);
+}
+
+.upload-card {
+  width: 100%;
+  max-width: 540px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.upload-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.upload-icon {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.upload-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+
+.upload-header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* ── File Input ─────────────────────────────────────────────── */
+
+.file-input-wrap {
+  position: relative;
+}
+
+.file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.file-input-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 2px dashed var(--border);
+  background: var(--bg-secondary);
+  transition: border-color var(--transition);
+}
+
+.file-input-wrap:hover .file-input-display {
+  border-color: var(--accent);
+}
+
+.file-input-icon {
+  font-size: 1.3rem;
+}
+
+.file-input-text {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

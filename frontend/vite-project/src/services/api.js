@@ -38,5 +38,20 @@ export const authAPI = {
   getProfile: () => api.get('/auth/me'),
 }
 
-export default api
+// ── Song endpoints ──────────────────────────────────────────────
 
+export const songsAPI = {
+  getAll: (search = '') => {
+    const params = search ? { search } : {}
+    return api.get('/songs', { params })
+  },
+  getById: (id) => api.get(`/songs/${id}`),
+  upload: (formData) =>
+    api.post('/songs/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  delete: (id) => api.delete(`/songs/${id}`),
+  getStreamUrl: (id) => `/api/v1/songs/${id}/stream`,
+}
+
+export default api

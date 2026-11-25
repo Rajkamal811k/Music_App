@@ -1,3 +1,4 @@
+from sqlalchemy import Index, text
 from datetime import datetime, timezone
 
 from sqlalchemy import (
@@ -15,6 +16,14 @@ from app.models.enums import UserRole
 
 
 class User(Base):
+    __table_args__ = (
+    Index(
+        "uq_users_single_admin",
+        "role",
+        unique=True,
+        postgresql_where=text("role = 'ADMIN'")
+    ),
+)
 
     __tablename__ = "users"
 
@@ -57,4 +66,13 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc)
+    )
+    full_name: Mapped[str | None] = mapped_column(
+    String(100),
+    nullable=True
+    )
+
+    avatar_url: Mapped[str | None] = mapped_column(
+    String(500),
+    nullable=True
     )

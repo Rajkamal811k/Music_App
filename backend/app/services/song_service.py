@@ -1,148 +1,143 @@
-import os
-import uuid
-
-from fastapi import HTTPException, UploadFile, status
-
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.song import Song
+from app.models.user import User
 from app.models.enums import UserRole
+
+from app.schemas.song import SongCreate, SongUpdate
+
 from app.repositories import song_repository
+from app.repositories import album_repository
 
 
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
-SONGS_DIR = os.path.join(UPLOAD_DIR, "songs")
-COVERS_DIR = os.path.join(UPLOAD_DIR, "covers")
-
-ALLOWED_AUDIO_TYPES = {
-    "audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg",
-    "audio/flac", "audio/aac", "audio/x-wav", "audio/webm",
-    "audio/mp4", "audio/x-m4a",
-}
-
-
-def _ensure_dirs():
-    os.makedirs(SONGS_DIR, exist_ok=True)
-    os.makedirs(COVERS_DIR, exist_ok=True)
-
-
-def upload_song(
+def create_song(
     db: Session,
-    title: str,
-    artist: str,
-    album: str,
-    genre: str,
-    file: UploadFile,
-    user_id: int,
-    cover: UploadFile = None
-) -> Song:
-
-    _ensure_dirs()
-
-    # Validate file type
-    content_type = file.content_type or ""
-    if content_type not in ALLOWED_AUDIO_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid audio file type: {content_type}. Allowed: mp3, wav, ogg, flac, aac, webm, m4a"
+    data: SongCreate,
+    current_user: User,
+):
+    # Validate album ownership if an album was selected.
+    if data.album_id is not None:
+        album = album_repository.get_album_by_id(
+            db,
+            data.album_id,
         )
 
-    # Save audio file
-    ext = os.path.splitext(file.filename or "audio.mp3")[1]
-    unique_name = f"{uuid.uuid4().hex}{ext}"
-    file_path = os.path.join(SONGS_DIR, unique_name)
+        if not album:
+            raise HTTPException(
+                status_code=404,
+                detail="Album not found",
+            )
 
-    with open(file_path, "wb") as f:
-        content = file.file.read()
-        f.write(content)
-
-    # Save cover image if provided
-    cover_path = None
-    if cover and cover.filename:
-        cover_ext = os.path.splitext(cover.filename)[1]
-        cover_name = f"{uuid.uuid4().hex}{cover_ext}"
-        cover_full = os.path.join(COVERS_DIR, cover_name)
-        with open(cover_full, "wb") as f:
-            f.write(cover.file.read())
-        cover_path = f"uploads/covers/{cover_name}"
-
-    # Estimate duration from file size (rough: ~16KB per second for 128kbps mp3)
-    file_size = len(content)
-    estimated_duration = max(1, file_size // 16000)
+        if album.creator_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only add songs to your own albums",
+            )
 
     song = Song(
-        title=title,
-        artist=artist,
-        album=album or "",
-        genre=genre or "",
-        duration=estimated_duration,
-        file_path=f"uploads/songs/{unique_name}",
-        cover_image_path=cover_path,
-        uploaded_by=user_id
+        title=data.title,
+        lyrics=data.lyrics,
+        genre=data.genre,
+        duration_seconds=data.duration_seconds,
+        album_id=data.album_id,
+        creator_id=current_user.id,
     )
 
-    try:
-        return song_repository.create_song(db, song)
-    except Exception:
-        # Clean up file if DB insert fails
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        db.rollback()
-        raise
-
-
-def get_all_songs(db: Session):
-    return song_repository.get_all_songs(db)
+    return song_repository.create_song(db, song)
 
 
 def get_song(db: Session, song_id: int):
-
     song = song_repository.get_song_by_id(db, song_id)
 
-    if not song:
+    if not song or not song.is_active:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Song not found"
+            status_code=404,
+            detail="Song not found",
         )
 
     return song
 
 
-def search(db: Session, query: str):
+def get_songs(db: Session, skip: int = 0, limit: int = 10):
+    return song_repository.get_all_songs(
+        db,
+        skip,
+        limit,
+    )
 
-    if not query or not query.strip():
-        return song_repository.get_all_songs(db)
 
-    return song_repository.search_songs(db, query.strip())
+def get_my_songs(
+    db: Session,
+    current_user: User,
+    skip: int = 0,
+    limit: int = 10,
+):
+    return song_repository.get_songs_by_creator(
+        db,
+        current_user.id,
+        skip,
+        limit,
+    )
 
 
-def delete_song(db: Session, song_id: int, current_user):
+def update_song(
+    db: Session,
+    song_id: int,
+    data: SongUpdate,
+    current_user: User,
+):
+    song = get_song(db, song_id)
 
-    song = song_repository.get_song_by_id(db, song_id)
-
-    if not song:
+    if song.creator_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Song not found"
+            status_code=403,
+            detail="You can only update your own songs",
         )
 
-    if song.uploaded_by != current_user.id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to delete this song"
+    update_data = data.model_dump(exclude_unset=True)
+
+    # Validate the new album if album_id is being changed.
+    if "album_id" in update_data and update_data["album_id"] is not None:
+        album = album_repository.get_album_by_id(
+            db,
+            update_data["album_id"],
         )
 
-    # Delete file from disk
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    full_path = os.path.join(base_dir, song.file_path)
-    if os.path.exists(full_path):
-        os.remove(full_path)
+        if not album:
+            raise HTTPException(
+                status_code=404,
+                detail="Album not found",
+            )
 
-    if song.cover_image_path:
-        cover_full = os.path.join(base_dir, song.cover_image_path)
-        if os.path.exists(cover_full):
-            os.remove(cover_full)
+        if album.creator_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only assign songs to your own albums",
+            )
 
-    song_repository.delete_song(db, song)
+    for field, value in update_data.items():
+        setattr(song, field, value)
 
-    return {"detail": "Song deleted successfully"}
+    return song_repository.update_song(db, song)
+
+
+def delete_song(
+    db: Session,
+    song_id: int,
+    current_user: User,
+):
+    song = get_song(db, song_id)
+
+    is_owner = song.creator_id == current_user.id
+    is_admin = current_user.role == UserRole.ADMIN
+
+    if not is_owner and not is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="You cannot delete this song",
+        )
+
+    song_repository.deactivate_song(db, song)
+
+    return {"message": "Song deactivated successfully"}

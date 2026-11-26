@@ -1,136 +1,121 @@
-import os
-from typing import Optional
-
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
-from fastapi.responses import FileResponse
-
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
+from app.core.dependencies import (
+    get_current_user,
+    require_role,
+)
 
-from app.schemas.song import SongResponse, SongListResponse
+from app.models.user import User
+from app.models.enums import UserRole
+
+from app.schemas.song import (
+    SongCreate,
+    SongUpdate,
+    SongResponse,
+)
 
 from app.services import song_service
-
-from app.core.dependencies import get_current_user, require_role
-
-from app.models.enums import UserRole
 
 
 router = APIRouter(
     prefix="/songs",
-    tags=["Songs"]
+    tags=["Songs"],
 )
+
+creator_access = require_role(UserRole.CREATOR)
 
 
 @router.post(
-    "/upload",
+    "",
     response_model=SongResponse,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
 )
-def upload_song(
-    title: str = Form(...),
-    artist: str = Form(...),
-    album: str = Form(""),
-    genre: str = Form(""),
-    file: UploadFile = File(...),
-    cover: Optional[UploadFile] = File(None),
-    current_user=Depends(require_role(UserRole.CREATOR, UserRole.ADMIN)),
-    db: Session = Depends(get_db)
+def create_song(
+    data: SongCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(creator_access),
 ):
-
-    return song_service.upload_song(
-        db=db,
-        title=title,
-        artist=artist,
-        album=album,
-        genre=genre,
-        file=file,
-        user_id=current_user.id,
-        cover=cover
+    return song_service.create_song(
+        db,
+        data,
+        current_user,
     )
 
 
 @router.get(
     "",
-    response_model=SongListResponse
+    response_model=list[SongResponse],
 )
-def list_songs(
-    search: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+def get_songs(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
 ):
-
-    if search:
-        songs = song_service.search(db, search)
-    else:
-        songs = song_service.get_all_songs(db)
-
-    return {
-        "songs": songs,
-        "total": len(songs)
-    }
-
-
-@router.get(
-    "/{song_id}",
-    response_model=SongResponse
-)
-def get_song(
-    song_id: int,
-    db: Session = Depends(get_db)
-):
-
-    return song_service.get_song(db, song_id)
-
-
-@router.get(
-    "/{song_id}/stream"
-)
-def stream_song(
-    song_id: int,
-    db: Session = Depends(get_db)
-):
-
-    song = song_service.get_song(db, song_id)
-
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    full_path = os.path.join(base_dir, song.file_path)
-
-    if not os.path.exists(full_path):
-        from fastapi import HTTPException
-        raise HTTPException(
-            status_code=404,
-            detail="Audio file not found on disk"
-        )
-
-    # Determine media type
-    ext = os.path.splitext(full_path)[1].lower()
-    media_types = {
-        ".mp3": "audio/mpeg",
-        ".wav": "audio/wav",
-        ".ogg": "audio/ogg",
-        ".flac": "audio/flac",
-        ".aac": "audio/aac",
-        ".m4a": "audio/mp4",
-        ".webm": "audio/webm",
-    }
-    media_type = media_types.get(ext, "audio/mpeg")
-
-    return FileResponse(
-        full_path,
-        media_type=media_type,
-        filename=f"{song.title}{ext}"
+    return song_service.get_songs(
+        db,
+        skip,
+        limit,
     )
 
 
-@router.delete(
-    "/{song_id}",
-    status_code=status.HTTP_200_OK
+# Keep this route before /{song_id}.
+@router.get(
+    "/my-songs",
+    response_model=list[SongResponse],
 )
+def get_my_songs(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(creator_access),
+):
+    return song_service.get_my_songs(
+        db,
+        current_user,
+        skip,
+        limit,
+    )
+
+
+@router.get(
+    "/{song_id}",
+    response_model=SongResponse,
+)
+def get_song(
+    song_id: int,
+    db: Session = Depends(get_db),
+):
+    return song_service.get_song(db, song_id)
+
+
+@router.patch(
+    "/{song_id}",
+    response_model=SongResponse,
+)
+def update_song(
+    song_id: int,
+    data: SongUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(creator_access),
+):
+    return song_service.update_song(
+        db,
+        song_id,
+        data,
+        current_user,
+    )
+
+
+@router.delete("/{song_id}")
 def delete_song(
     song_id: int,
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-
-    return song_service.delete_song(db, song_id, current_user)
+    return song_service.delete_song(
+        db,
+        song_id,
+        current_user,
+    )

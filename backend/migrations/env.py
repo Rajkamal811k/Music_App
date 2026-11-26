@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.database.connection import Base
 
 # Import all models so Alembic can detect them
-from app.models import User, CreatorProfile, Album
+from app.models import User, CreatorProfile, Album, Song
 
 
 config = context.config
